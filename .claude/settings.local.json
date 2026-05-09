@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "PowerShell(New-NetFirewallRule *3)"
+    ]
+  }
+}

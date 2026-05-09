@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Age Checker — ECA Digital</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            woovi: {
+              green:   { DEFAULT: '#00BB83', dark: '#033B2E' },
+              neutral: { dark: '#101828', gray: '#667085', border: '#E4E7EC' },
+              bg:      { light: '#F4F7F5' }
+            }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    ::selection { background: #00BB83; color: #101828; }
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    .anim-spin  { animation: spin 0.85s linear infinite; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .anim-fade  { animation: fadeUp 0.28s ease forwards; }
+    @keyframes flash  { 0%,100% { opacity: 0; } 50% { opacity: 0.65; } }
+    .anim-flash { animation: flash 0.25s ease; }
+  </style>
+</head>
+<body class="bg-woovi-neutral-dark antialiased">
+<div id="root"></div>
+<script type="text/babel">
+  const { useState, useEffect, useRef } = React;
+
+  /* ── SVG icon primitive ───────────────────────────────────────────────── */
+  function Svg({ children, s = 20, c = '' }) {
+    return (
+      <svg width={s} height={s} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+        strokeLinejoin="round" className={c}>
+        {children}
+      </svg>
+    );
+  }
+
+  /* ── Lucide-style icons ───────────────────────────────────────────────── */
+  const ShieldIcon   = ({ s, c }) => <Svg s={s} c={c}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Svg>;
+  const CameraIcon   = ({ s, c }) => <Svg s={s} c={c}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></Svg>;
+  const CheckCircle  = ({ s, c }) => <Svg s={s} c={c}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Svg>;
+  const XCircleIcon  = ({ s, c }) => <Svg s={s} c={c}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></Svg>;
+  const BarChartIcon = ({ s, c }) => <Svg s={s} c={c}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></Svg>;
+  const Code2Icon    = ({ s, c }) => <Svg s={s} c={c}><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></Svg>;
+  const TerminalIcon = ({ s, c }) => <Svg s={s} c={c}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></Svg>;
+  const LockIcon     = ({ s, c }) => <Svg s={s} c={c}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Svg>;
+  const ArrowRight   = ({ s, c }) => <Svg s={s} c={c}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Svg>;
+  const PackageIcon  = ({ s, c }) => <Svg s={s} c={c}><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></Svg>;
+  const GlobeIcon    = ({ s, c }) => <Svg s={s} c={c}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Svg>;
+  const RefreshIcon  = ({ s, c }) => <Svg s={s} c={c}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Svg>;
+  const LoaderIcon   = ({ s, c }) => <Svg s={s} c={c}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></Svg>;
+  const AlertIcon    = ({ s, c }) => <Svg s={s} c={c}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Svg>;
+  const HomeIcon     = ({ s, c }) => <Svg s={s} c={c}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></Svg>;
+  const EyeIcon      = ({ s, c }) => <Svg s={s} c={c}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Svg>;
+  const CpuIcon      = ({ s, c }) => <Svg s={s} c={c}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></Svg>;
+  const ZapIcon      = ({ s, c }) => <Svg s={s} c={c}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Svg>;
+
+  /* ── shared Badge ────────────────────────────────────────────────────── */
+  function Badge({ children, variant = 'green' }) {
+    const cls = {
+      green: 'bg-woovi-green/10 text-woovi-green border border-woovi-green/20',
+      gray:  'bg-white/5 text-white/40 border border-white/10',
+      amber: 'bg-amber-400/10 text-amber-400 border border-amber-400/20',
+    }[variant];
+    return (
+      <span className={'inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full ' + cls}>
+        {children}
+      </span>
+    );
+  }
+
+  /* ── shared CodeBlock ────────────────────────────────────────────────── */
+  function CodeBlock({ children, label }) {
+    return (
+      <div className="rounded-xl overflow-hidden border border-white/10">
+        {label && (
+          <div className="bg-white/5 border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
+            <TerminalIcon s={12} c="text-woovi-neutral-gray" />
+            <span className="text-xs font-mono text-woovi-neutral-gray">{label}</span>
+          </div>
+        )}
+        <pre className="bg-[#080d14] p-5 text-sm font-mono text-emerald-400 overflow-x-auto leading-relaxed whitespace-pre">
+          {children}
+        </pre>
+      </div>
+    );
+  }
+
+  /* ══ NAV ═════════════════════════════════════════════════════════════ */
+  function Nav({ page, setPage }) {
+    return (
+      <nav className="sticky top-0 z-50 bg-woovi-neutral-dark/95 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <button onClick={() => setPage('home')}
+            className="flex items-center gap-2.5 text-white font-bold text-base tracking-tight hover:opacity-80 transition-opacity">
+            <ShieldIcon s={20} c="text-woovi-green" />
+            Face Age Checker
+          </button>
+          <div className="flex items-center gap-1.5">
+            {[
+              { key: 'home',       Icon: HomeIcon, label: 'Início' },
+              { key: 'playground', Icon: EyeIcon,  label: 'Playground' },
+            ].map(({ key, Icon, label }) => (
+              <button key={key} onClick={() => setPage(key)}
+                className={
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ' +
+                  (page === key
+                    ? 'bg-woovi-green text-woovi-neutral-dark font-semibold'
+                    : 'text-white/50 hover:text-white hover:bg-white/5')
+                }>
+                <Icon s={15} />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
+  /* ══ LANDING ═════════════════════════════════════════════════════════ */
+  function Landing({ onPlay }) {
+    return (
+      <div>
+        <HeroSection onPlay={onPlay} />
+        <HowItWorks />
+        <APISection />
+        <NextSteps />
+        <PrivacySection />
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  function HeroSection({ onPlay }) {
+    return (
+      <section className="bg-woovi-neutral-dark pt-24 pb-32 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <Badge>ECA Digital</Badge>
+          <h1 className="mt-6 text-5xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.08]">
+            Verificação de Idade<br />
+            <span className="text-woovi-green">Inteligente</span>
+          </h1>
+          <p className="mt-6 text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
+            API open-source com visão computacional que estima a idade facial e determina
+            maioridade — desenvolvida para conformidade com o{' '}
+            <span className="text-white/70 font-medium">Estatuto da Criança e do Adolescente</span>.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <button onClick={onPlay}
+              className="inline-flex items-center gap-2 bg-woovi-green text-woovi-neutral-dark font-bold rounded-xl px-7 py-3.5 text-base hover:opacity-90 active:scale-95 transition-all">
+              <EyeIcon s={17} />
+              Abrir Playground
+              <ArrowRight s={15} />
+            </button>
+            <a href="/docs"
+              className="inline-flex items-center gap-2 border border-white/20 text-white/60 font-medium rounded-xl px-7 py-3.5 text-base hover:bg-white/5 hover:text-white transition-all">
+              <Code2Icon s={17} />
+              Documentação API
+            </a>
+          </div>
+          <div className="mt-20 grid grid-cols-3 gap-4 max-w-sm mx-auto">
+            {[
+              { val: '< 3s',  label: 'Resposta' },
+              { val: 'Zero',  label: 'Armazenamento' },
+              { val: 'Open',  label: 'Source' },
+            ].map(({ val, label }) => (
+              <div key={label} className="border border-white/10 rounded-2xl p-4">
+                <div className="text-xl font-extrabold text-woovi-green">{val}</div>
+                <div className="text-xs text-white/30 mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function HowItWorks() {
+    const steps = [
+      { Icon: CameraIcon,   n: '01', title: 'Captura',   desc: 'A aplicação captura a foto e converte para base64.' },
+      { Icon: Code2Icon,    n: '02', title: 'Envio',     desc: 'Um POST /verify-age é feito com o payload JSON.' },
+      { Icon: CpuIcon,      n: '03', title: 'Análise',   desc: 'DeepFace detecta o rosto e estima a idade via rede neural.' },
+      { Icon: BarChartIcon, n: '04', title: 'Resultado', desc: 'Resposta com idade estimada e flag is_adult para controle.' },
+    ];
+    return (
+      <section className="bg-woovi-bg-light py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-14">
+            <Badge variant="gray">Como funciona</Badge>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-woovi-neutral-dark tracking-tight">
+              Quatro passos, sem fricção
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {steps.map(({ Icon, n, title, desc }) => (
+              <div key={n} className="bg-white rounded-2xl border border-woovi-neutral-border p-6 flex flex-col gap-5">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-woovi-green/10 flex items-center justify-center">
+                    <Icon s={19} c="text-woovi-green" />
+                  </div>
+                  <span className="text-xs font-bold text-woovi-neutral-border tabular-nums">{n}</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-woovi-neutral-dark text-sm mb-1.5">{title}</h3>
+                  <p className="text-xs text-woovi-neutral-gray leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <div className="flex items-center gap-2 bg-woovi-green/10 border border-woovi-green/25 text-woovi-green rounded-full px-4 py-2 text-sm font-semibold">
+              <CheckCircle s={15} />
+              is_adult: true — acesso liberado
+            </div>
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 text-red-400 rounded-full px-4 py-2 text-sm font-semibold">
+              <XCircleIcon s={15} />
+              is_adult: false — acesso negado
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function APISection() {
+    return (
+      <section className="bg-woovi-neutral-dark py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-14">
+            <Badge>Integração</Badge>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              API simples, resultado direto
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+            <CodeBlock label="POST /verify-age — body">{'{\n  "image_base64": "iVBORw0KGgo..."\n}'}</CodeBlock>
+            <CodeBlock label="Response 200 OK">{'{\n  "estimated_age": 28,\n  "is_adult": true,\n  "confidence": 1.0\n}'}</CodeBlock>
+          </div>
+          <div className="rounded-xl overflow-hidden border border-white/10">
+            <div className="bg-white/5 border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
+              <TerminalIcon s={12} c="text-woovi-neutral-gray" />
+              <span className="text-xs font-mono text-woovi-neutral-gray">Self-hosted com uv</span>
+            </div>
+            <pre className="bg-[#080d14] px-5 py-4 text-sm font-mono leading-7 overflow-x-auto whitespace-pre">
+              <span className="text-white/25">{'# instalar uv\n'}</span>
+              <span className="text-emerald-400">{'pip install uv\n\n'}</span>
+              <span className="text-white/25">{'# uv lê as dependências do bloco # /// script\n'}</span>
+              <span className="text-emerald-400">{'uv run main.py'}</span>
+            </pre>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function NextSteps() {
+    return (
+      <section className="bg-woovi-bg-light py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-14">
+            <div className="flex items-center gap-3 mb-4">
+              <Badge variant="gray">Roadmap</Badge>
+              <Badge variant="amber">Em breve</Badge>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-woovi-neutral-dark tracking-tight">
+              Próximos passos
+            </h2>
+            <p className="mt-3 text-woovi-neutral-gray max-w-xl text-sm leading-relaxed">
+              Tornar a integração tão simples quanto possível — de um backend Node.js a
+              qualquer página web com uma única linha de código.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* SDK */}
+            <div className="bg-white border border-woovi-neutral-border rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-woovi-neutral-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-woovi-neutral-dark flex items-center justify-center flex-shrink-0">
+                    <PackageIcon s={19} c="text-woovi-green" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-woovi-neutral-dark text-sm">SDK JavaScript / TypeScript</h3>
+                    <p className="text-xs text-woovi-neutral-gray mt-0.5">Wrapper tipado da API + câmera</p>
+                  </div>
+                </div>
+                <p className="text-xs text-woovi-neutral-gray leading-relaxed">
+                  Abstrai câmera, conversão base64 e chamada à API em uma interface
+                  Promise-based com tipos TypeScript completos e tree-shaking.
+                </p>
+              </div>
+              <div className="flex-1 bg-[#080d14]">
+                <pre className="p-5 text-xs font-mono text-emerald-400 overflow-x-auto leading-relaxed whitespace-pre">
+                  {"// npm install face-age-checker\nimport { FaceAgeChecker } from 'face-age-checker';\n\nconst checker = new FaceAgeChecker({\n  endpoint: 'http://localhost:8000',\n});\n\nconst result = await checker.verifyFromCamera();\n// { estimated_age: 28, is_adult: true }"}
+                </pre>
+              </div>
+              <div className="px-6 py-4 flex flex-wrap gap-2 border-t border-woovi-neutral-border">
+                {['TypeScript', 'Promise-based', 'Zero deps', 'Tree-shakeable'].map(t => (
+                  <span key={t} className="text-xs bg-woovi-green/8 text-woovi-green border border-woovi-green/20 px-2.5 py-1 rounded-full font-medium">{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* embed script */}
+            <div className="bg-white border border-woovi-neutral-border rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-woovi-neutral-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-woovi-neutral-dark flex items-center justify-center flex-shrink-0">
+                    <GlobeIcon s={19} c="text-woovi-green" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-woovi-neutral-dark text-sm">Embed via &lt;script&gt;</h3>
+                    <p className="text-xs text-woovi-neutral-gray mt-0.5">Drop-in para qualquer site</p>
+                  </div>
+                </div>
+                <p className="text-xs text-woovi-neutral-gray leading-relaxed">
+                  Uma linha insere o widget de verificação em qualquer página — sem build,
+                  sem configuração, via custom element HTML nativo.
+                </p>
+              </div>
+              <div className="flex-1 bg-[#080d14]">
+                <pre className="p-5 text-xs font-mono text-emerald-400 overflow-x-auto leading-relaxed whitespace-pre">
+                  {'<script\n  src="cdn.../face-age-checker/embed.min.js"\n  data-endpoint="http://localhost:8000"\n  data-on-allow="onAllow"\n  defer>\n<\/script>\n\n<div id="age-gate"><\/div>'}
+                </pre>
+              </div>
+              <div className="px-6 py-4 flex flex-wrap gap-2 border-t border-woovi-neutral-border">
+                {['Sem build', 'Custom element', 'data-* API', 'CSP-friendly'].map(t => (
+                  <span key={t} className="text-xs bg-woovi-green/8 text-woovi-green border border-woovi-green/20 px-2.5 py-1 rounded-full font-medium">{t}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function PrivacySection() {
+    return (
+      <section className="bg-woovi-green-dark py-24 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="w-14 h-14 rounded-2xl bg-woovi-green/15 border border-woovi-green/25 flex items-center justify-center mx-auto mb-6">
+            <LockIcon s={26} c="text-woovi-green" />
+          </div>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight mb-4">
+            Privacidade por padrão
+          </h2>
+          <p className="text-white/45 text-base leading-relaxed">
+            Nenhuma imagem é armazenada. O processamento ocorre inteiramente em memória —
+            a foto entra, o resultado sai, os pixels são descartados. Sem banco de dados,
+            sem logs de imagens, sem serviços externos.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  function SiteFooter() {
+    return (
+      <footer className="bg-woovi-neutral-dark border-t border-white/10 py-10 px-6">
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-white/30 text-sm">
+            <ShieldIcon s={15} c="text-woovi-green" />
+            Face Age Checker
+          </div>
+          <div className="text-xs text-white/20">
+            Feito por <span className="text-white/45 font-semibold">Mateus Schverz</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-white/25">
+            <a href="https://github.com/serengil/deepface" className="hover:text-white/60 transition-colors">DeepFace</a>
+            <a href="https://fastapi.tiangolo.com" className="hover:text-white/60 transition-colors">FastAPI</a>
+            <a href="/docs" className="hover:text-white/60 transition-colors">API Docs</a>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  /* ══ PLAYGROUND ══════════════════════════════════════════════════════ */
+  const STEP_META = [
+    { label: 'Introdução', Icon: EyeIcon     },
+    { label: 'Câmera',     Icon: CameraIcon  },
+    { label: 'Confirmar',  Icon: CheckCircle },
+    { label: 'Resultado',  Icon: BarChartIcon},
+  ];
+
+  function Stepper({ current }) {
+    return (
+      <div className="max-w-lg mx-auto px-6 pt-10 pb-2">
+        <div className="flex items-center">
+          {STEP_META.map(({ label, Icon }, i) => {
+            const done   = i < current;
+            const active = i === current;
+            return (
+              <React.Fragment key={i}>
+                <div className="flex flex-col items-center gap-2">
+                  <div className={
+                    'w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ' +
+                    (done || active
+                      ? 'bg-woovi-green text-woovi-neutral-dark' + (active ? ' ring-4 ring-woovi-green/20' : '')
+                      : 'bg-white/8 text-white/25')
+                  }>
+                    {done ? <CheckCircle s={16} /> : <Icon s={15} />}
+                  </div>
+                  <span className={'text-xs font-medium hidden sm:block transition-colors duration-300 ' +
+                    (active ? 'text-white' : done ? 'text-woovi-green' : 'text-white/25')}>
+                    {label}
+                  </span>
+                </div>
+                {i < STEP_META.length - 1 && (
+                  <div className={'flex-1 h-px mx-3 mb-5 transition-all duration-500 ' +
+                    (done ? 'bg-woovi-green' : 'bg-white/10')} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function StepIntro({ onNext }) {
+    const items = [
+      { Icon: CameraIcon,  title: 'Câmera',      desc: 'A webcam é ativada para capturar uma selfie' },
+      { Icon: CheckCircle, title: 'Confirmação', desc: 'Você revisa a foto antes de enviar' },
+      { Icon: CpuIcon,     title: 'Análise',     desc: 'DeepFace estima a idade em milissegundos' },
+      { Icon: BarChartIcon,title: 'Resultado',   desc: 'Idade estimada e status de maioridade' },
+    ];
+    return (
+      <div className="anim-fade max-w-sm mx-auto px-6 pb-16 pt-6">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-woovi-green/10 border border-woovi-green/20 flex items-center justify-center mx-auto mb-5">
+            <EyeIcon s={26} c="text-woovi-green" />
+          </div>
+          <h2 className="text-2xl font-extrabold text-white mb-2">Playground</h2>
+          <p className="text-white/40 text-sm leading-relaxed">
+            Teste a verificação de idade em tempo real. Nenhuma imagem é salva.
+          </p>
+        </div>
+        <div className="border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/8 mb-6">
+          {items.map(({ Icon, title, desc }, i) => (
+            <div key={i} className="flex items-start gap-3 p-4">
+              <div className="w-8 h-8 rounded-lg bg-woovi-green/10 flex items-center justify-center flex-shrink-0">
+                <Icon s={15} c="text-woovi-green" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{title}</p>
+                <p className="text-xs text-white/35 mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={onNext}
+          className="w-full flex items-center justify-center gap-2 bg-woovi-green text-woovi-neutral-dark font-bold rounded-xl py-3.5 hover:opacity-90 active:scale-95 transition-all">
+          Começar
+          <ArrowRight s={16} />
+        </button>
+      </div>
+    );
+  }
+
+  function StepCamera({ onCapture, onBack }) {
+    const videoRef  = useRef(null);
+    const streamRef = useRef(null);
+    const [ready,    setReady]    = useState(false);
+    const [camErr,   setCamErr]   = useState(null);
+    const [flashing, setFlashing] = useState(false);
+
+    useEffect(function() {
+      var active = true;
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } })
+        .then(function(stream) {
+          if (!active) { stream.getTracks().forEach(function(t) { t.stop(); }); return; }
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.onloadedmetadata = function() { setReady(true); };
+          }
+        })
+        .catch(function(e) { if (active) setCamErr(e.message); });
+      return function() {
+        active = false;
+        if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); });
+      };
+    }, []);
+
+    function capture() {
+      var video = videoRef.current;
+      var canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.translate(canvas.width, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0);
+      setFlashing(true);
+      var b64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+      if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); });
+      setTimeout(function() { setFlashing(false); onCapture(b64); }, 260);
+    }
+
+    if (camErr) return (
+      <div className="anim-fade max-w-sm mx-auto px-6 pb-16 pt-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-5">
+          <AlertIcon s={26} c="text-red-400" />
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Câmera indisponível</h3>
+        <p className="text-white/35 text-sm mb-2">{camErr}</p>
+        <p className="text-white/25 text-xs mb-8 leading-relaxed">
+          Browsers móveis requerem HTTPS para acessar a câmera em redes locais.
+        </p>
+        <button onClick={onBack}
+          className="inline-flex items-center gap-2 border border-white/15 text-white/50 px-5 py-2.5 rounded-xl text-sm hover:bg-white/5 transition-all">
+          Voltar
+        </button>
+      </div>
+    );
+
+    return (
+      <div className="anim-fade max-w-xl mx-auto px-6 pb-16 pt-4">
+        <div className="relative rounded-2xl overflow-hidden bg-black mb-5 aspect-[4/3]">
+          <video ref={videoRef} autoPlay muted playsInline
+            className="w-full h-full object-cover block" style={{ transform: 'scaleX(-1)' }} />
+          {flashing && <div className="anim-flash absolute inset-0 bg-white pointer-events-none" />}
+          {!ready && (
+            <div className="absolute inset-0 flex items-center justify-center text-white/35 text-sm gap-3">
+              <LoaderIcon s={18} c="anim-spin" />
+              Iniciando câmera…
+            </div>
+          )}
+          {ready && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-woovi-green/60 rounded-full"
+                style={{ width: '38%', paddingBottom: '48%', boxShadow: '0 0 0 9999px rgba(0,0,0,0.42)' }} />
+            </div>
+          )}
+        </div>
+        <p className="text-center text-xs text-white/25 mb-5">
+          Posicione seu rosto no contorno com boa iluminação
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={onBack}
+            className="flex items-center gap-2 border border-white/15 text-white/45 px-5 py-2.5 rounded-xl text-sm hover:bg-white/5 transition-all">
+            Voltar
+          </button>
+          <button onClick={capture} disabled={!ready}
+            className="flex items-center gap-2 bg-woovi-green text-woovi-neutral-dark font-bold px-6 py-2.5 rounded-xl text-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <CameraIcon s={15} />
+            Capturar foto
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function StepConfirm({ photo, onRetake, onSubmit, loading, apiError }) {
+    return (
+      <div className="anim-fade max-w-sm mx-auto px-6 pb-16 pt-4">
+        <h3 className="text-center text-lg font-bold text-white mb-5">Confirmar foto</h3>
+        <div className="rounded-2xl overflow-hidden border border-white/10 mb-5">
+          <img src={'data:image/jpeg;base64,' + photo} alt="Foto capturada" className="w-full block" />
+        </div>
+        {apiError && (
+          <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-5 text-red-400 text-sm">
+            <AlertIcon s={16} c="flex-shrink-0 mt-0.5" />
+            {apiError}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onRetake} disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 border border-white/15 text-white/45 py-3 rounded-xl text-sm hover:bg-white/5 transition-all disabled:opacity-40">
+            Tirar novamente
+          </button>
+          <button onClick={onSubmit} disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 bg-woovi-green text-woovi-neutral-dark font-bold py-3 rounded-xl text-sm hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            {loading
+              ? <React.Fragment><LoaderIcon s={15} c="anim-spin" /> Analisando</React.Fragment>
+              : <React.Fragment><ZapIcon s={15} /> Analisar</React.Fragment>}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function StepResult({ result, photo, onReset }) {
+    var adult = result.is_adult;
+    var ringCls   = adult ? 'border-woovi-green'    : 'border-red-500';
+    var iconBgCls = adult ? 'bg-woovi-green/10 border-woovi-green/25' : 'bg-red-500/10 border-red-500/25';
+    var titleCls  = adult ? 'text-woovi-green'      : 'text-red-400';
+    return (
+      <div className="anim-fade max-w-sm mx-auto px-6 pb-16 pt-4 text-center">
+        <div className={'w-16 h-16 rounded-2xl border flex items-center justify-center mx-auto mb-5 ' + iconBgCls}>
+          {adult ? <CheckCircle s={30} c="text-woovi-green" /> : <XCircleIcon s={30} c="text-red-400" />}
+        </div>
+        <h3 className={'text-2xl font-extrabold mb-1 ' + titleCls}>
+          {adult ? 'Acesso Liberado' : 'Acesso Negado'}
+        </h3>
+        <p className="text-white/35 text-sm mb-8">
+          {adult ? 'Identificado como maior de 18 anos.' : 'Identificado como menor de 18 anos.'}
+        </p>
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {[
+            { label: 'Idade',     value: result.estimated_age + ' anos', hi: true  },
+            { label: 'Adulto',    value: adult ? 'Sim' : 'Não',          hi: adult },
+            { label: 'Confiança', value: (result.confidence * 100).toFixed(0) + '%', hi: false },
+          ].map(function(item) {
+            return (
+              <div key={item.label} className="border border-white/10 rounded-xl p-3">
+                <div className={'text-base font-bold ' + (item.hi ? 'text-woovi-green' : 'text-white/60')}>{item.value}</div>
+                <div className="text-xs text-white/25 mt-0.5">{item.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        {photo && (
+          <div className={'w-20 h-20 rounded-full overflow-hidden mx-auto mb-6 border-2 ' + ringCls}>
+            <img src={'data:image/jpeg;base64,' + photo} alt="foto" className="w-full h-full object-cover" />
+          </div>
+        )}
+        <div className="border border-white/10 rounded-xl overflow-hidden mb-6 text-left">
+          <div className="bg-white/5 border-b border-white/8 px-4 py-2 flex items-center gap-2">
+            <Code2Icon s={11} c="text-white/25" />
+            <span className="text-xs font-mono text-white/25">API response</span>
+          </div>
+          <pre className="bg-[#080d14] p-4 text-xs font-mono text-emerald-400 leading-relaxed">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </div>
+        <button onClick={onReset}
+          className="inline-flex items-center gap-2 border border-white/15 text-white/45 px-6 py-2.5 rounded-xl text-sm hover:bg-white/5 transition-all">
+          <RefreshIcon s={14} />
+          Testar novamente
+        </button>
+      </div>
+    );
+  }
+
+  function Playground() {
+    var s0 = useState(0);    var step = s0[0]; var setStep = s0[1];
+    var s1 = useState(null); var photo = s1[0]; var setPhoto = s1[1];
+    var s2 = useState(null); var result = s2[0]; var setResult = s2[1];
+    var s3 = useState(false);var loading = s3[0]; var setLoading = s3[1];
+    var s4 = useState(null); var apiError = s4[0]; var setApiError = s4[1];
+
+    function handleCapture(b64) { setPhoto(b64); setStep(2); }
+    function handleRetake()     { setPhoto(null); setStep(1); }
+    function handleReset()      { setStep(0); setPhoto(null); setResult(null); setApiError(null); }
+    function handleSubmit() {
+      setLoading(true); setApiError(null);
+      fetch('/verify-age', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: photo }),
+      })
+        .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.detail || 'Erro'); return d; }); })
+        .then(function(d) { setResult(d); setStep(3); })
+        .catch(function(e) { setApiError(e.message); })
+        .finally(function() { setLoading(false); });
+    }
+
+    return (
+      <div className="min-h-screen bg-woovi-neutral-dark">
+        <Stepper current={step} />
+        <div className="border-t border-white/8 mb-6" />
+        {step === 0 && <StepIntro   onNext={function() { setStep(1); }} />}
+        {step === 1 && <StepCamera  onCapture={handleCapture} onBack={function() { setStep(0); }} />}
+        {step === 2 && <StepConfirm photo={photo} onRetake={handleRetake} onSubmit={handleSubmit} loading={loading} apiError={apiError} />}
+        {step === 3 && <StepResult  result={result} photo={photo} onReset={handleReset} />}
+      </div>
+    );
+  }
+
+  /* ── root ─────────────────────────────────────────────────────────── */
+  function App() {
+    var s = useState('home'); var page = s[0]; var setPage = s[1];
+    return (
+      <React.Fragment>
+        <Nav page={page} setPage={setPage} />
+        {page === 'home'
+          ? <Landing onPlay={function() { setPage('playground'); }} />
+          : <Playground />}
+      </React.Fragment>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
