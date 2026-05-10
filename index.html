@@ -203,7 +203,7 @@
     const steps = [
       { Icon: CameraIcon,   n: '01', title: 'Captura',   desc: 'A aplicação captura a foto e converte para base64.' },
       { Icon: Code2Icon,    n: '02', title: 'Envio',     desc: 'Um POST /verify-age é feito com o payload JSON.' },
-      { Icon: CpuIcon,      n: '03', title: 'Análise',   desc: 'DeepFace detecta o rosto e estima a idade via rede neural.' },
+      { Icon: CpuIcon,      n: '03', title: 'Análise',   desc: 'Um modelo ViT (Vision Transformer) estima a idade via rede neural.' },
       { Icon: BarChartIcon, n: '04', title: 'Resultado', desc: 'Resposta com idade estimada e flag is_adult para controle.' },
     ];
     return (
@@ -390,7 +390,7 @@
             Feito por <span className="text-white/45 font-semibold">Mateus Schverz</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-white/25">
-            <a href="https://github.com/serengil/deepface" className="hover:text-white/60 transition-colors">DeepFace</a>
+            <a href="https://huggingface.co/nateraw/vit-age-classifier" className="hover:text-white/60 transition-colors">ViT Model</a>
             <a href="https://fastapi.tiangolo.com" className="hover:text-white/60 transition-colors">FastAPI</a>
             <a href="/docs" className="hover:text-white/60 transition-colors">API Docs</a>
           </div>
