@@ -2,7 +2,7 @@
 
 <img width="1915" height="1026" alt="Face Age Checker landing page" src="https://github.com/user-attachments/assets/3055ad08-dbd6-4473-aab0-db4002c1c1ef" />
 
-An open-source facial age verification API built with FastAPI and DeepFace — designed to help digital platforms comply with Brazil's **Estatuto da Criança e do Adolescente (ECA, Law nº 8.069/90)**, which restricts minors from accessing certain content and services.
+An open-source facial age verification API built with FastAPI — designed to help digital platforms comply with Brazil's **Estatuto da Criança e do Adolescente (ECA, Law nº 8.069/90)**, which restricts minors from accessing certain content and services.
 
 ---
 
@@ -10,8 +10,9 @@ An open-source facial age verification API built with FastAPI and DeepFace — d
 
 1. The client captures a photo and encodes it as **base64**
 2. Sends a `POST /verify-age` request with the JSON payload
-3. **DeepFace** detects the face and estimates the age via a pre-trained neural network
-4. The API returns the estimated age and an `is_adult` flag the application can act on
+3. OpenCV's Haar cascade auto-corrects the image orientation (handles upside-down or rotated photos)
+4. The face is detected and cropped, then fed into a **Vision Transformer (ViT)** age classifier
+5. The API returns the estimated age and an `is_adult` flag the application can act on
 
 ```
 is_adult: true  → grant access
@@ -19,6 +20,22 @@ is_adult: false → deny access
 ```
 
 No images are stored. Processing happens entirely in memory.
+
+---
+
+## Age estimation model
+
+The project uses [`nateraw/vit-age-classifier`](https://huggingface.co/nateraw/vit-age-classifier) — a Vision Transformer fine-tuned on the **Adience dataset**, which covers all age ranges from infants to the elderly.
+
+The model outputs probability scores for 9 age buckets (`0-2`, `3-9`, `10-19`, …, `70+`). A probability-weighted average of the bucket midpoints produces a continuous age estimate.
+
+| Age | Old model (DeepFace) | Current model (ViT) |
+|-----|---------------------|---------------------|
+| 7 years old | ~25 years (wrong) | ~6–8 years (accurate) |
+| 15 years old | ~27 years (wrong) | ~14–16 years (accurate) |
+| 30 years old | ~32 years (ok) | ~28–32 years (accurate) |
+
+> Previous versions used DeepFace + TensorFlow, which has a documented positive bias of ±7–15 years for children. The ViT model eliminates this issue.
 
 ---
 
@@ -42,21 +59,26 @@ No images are stored. Processing happens entirely in memory.
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `estimated_age` | Continuous age estimate (probability-weighted average of ViT buckets) |
+| `is_adult` | `true` if `estimated_age ≥ 18` (ECA legal threshold) |
+| `confidence` | Always `1.0` — placeholder for future per-face detector confidence |
+
 **Error responses**
 
 | Status | Detail |
 |--------|--------|
 | `400`  | Invalid or corrupted image |
 | `404`  | No face detected in the image |
+| `422`  | Face detected but image quality too low for reliable estimation |
 | `500`  | Internal processing error |
-
-The `confidence` field is always `1.0` — DeepFace's age model is a regression network, not a softmax classifier.
 
 ---
 
 ## Self-hosted setup with `uv`
 
-The project uses [uv](https://github.com/astral-sh/uv) inline script metadata (`# /// script`) so you can run it with **zero manual dependency management**.
+The project uses [uv](https://github.com/astral-sh/uv) inline script metadata (`# /// script`) so you can run it with **zero manual dependency management** and no `requirements.txt`.
 
 ### Prerequisites
 
@@ -74,8 +96,7 @@ pip install uv
 git clone https://github.com/your-username/face-age-checker
 cd face-age-checker
 
-# uv reads the dependencies from the # /// script block at the top of main.py
-# and creates an isolated virtual environment automatically
+# uv reads the # /// script block, creates an isolated venv and installs everything
 uv run main.py
 ```
 
@@ -87,12 +108,15 @@ The server starts at `http://localhost:8000`.
 |---------|---------|
 | `fastapi` | Web framework |
 | `uvicorn` | ASGI server |
-| `deepface` | Facial analysis (age estimation) |
-| `tensorflow` + `tf-keras` | Neural network backend for DeepFace |
-| `opencv-python-headless` | Image decoding |
+| `torch` | PyTorch — inference backend for the ViT model |
+| `transformers` | HuggingFace — loads `nateraw/vit-age-classifier` |
+| `Pillow` | Image conversion for the ViT preprocessor |
+| `opencv-python-headless` | Image decoding + Haar cascade face detection |
 | `pydantic` | Request validation |
 
-> On first run, DeepFace downloads its pre-trained models (~500 MB). Subsequent runs are instant. The TensorFlow import is **lazy** — it only loads when the first `/verify-age` request is made, so the server starts in under a second.
+> **First run:** `uv` installs PyTorch (~180 MB) and the model weights are downloaded from HuggingFace (~350 MB) on the first `/verify-age` call. Subsequent runs are instant — both are cached locally.
+>
+> All model imports are **lazy** (inside the route handler), so the server starts in under a second.
 
 ---
 
@@ -104,7 +128,7 @@ curl -X POST http://localhost:8000/verify-age \
   -d '{"image_base64": "<your_base64_image>"}'
 ```
 
-Interactive Swagger docs are available at `http://localhost:8000/docs`.
+Interactive Swagger docs: `http://localhost:8000/docs`
 
 ---
 
@@ -113,7 +137,7 @@ Interactive Swagger docs are available at `http://localhost:8000/docs`.
 The server binds to `0.0.0.0` by default, so it is reachable from any device on the same network.
 
 1. Find your machine's local IP (e.g. `192.168.1.105`)
-2. Open a firewall rule for port 8000 (Windows — run as Administrator):
+2. Open a firewall rule for port 8000 — run PowerShell **as Administrator**:
 
 ```powershell
 New-NetFirewallRule -DisplayName "Face Age Checker dev (8000)" `
@@ -122,7 +146,7 @@ New-NetFirewallRule -DisplayName "Face Age Checker dev (8000)" `
 
 3. Access from your phone: `http://192.168.1.105:8000`
 
-> **Camera on mobile requires HTTPS.** Browsers block `getUserMedia` on non-localhost origins over plain HTTP. Use [ngrok](https://ngrok.com) for a quick HTTPS tunnel:
+> **Camera on mobile requires HTTPS.** Browsers block `getUserMedia` on non-localhost HTTP origins. Use [ngrok](https://ngrok.com) for a quick HTTPS tunnel:
 > ```bash
 > ngrok http 8000
 > ```
@@ -131,7 +155,7 @@ New-NetFirewallRule -DisplayName "Face Age Checker dev (8000)" `
 
 ## Playground
 
-The landing page at `/` includes an interactive **Playground** — a four-step wizard that lets you test the API directly from the browser:
+The landing page at `/` includes an interactive **Playground** — a four-step wizard that lets you test the API directly in the browser using your webcam:
 
 | Step | Description |
 |------|-------------|
@@ -139,6 +163,12 @@ The landing page at `/` includes an interactive **Playground** — a four-step w
 | Camera | Live webcam capture via the browser's native `getUserMedia` API |
 | Confirm | Review the photo before sending |
 | Result | Estimated age, adult status, and raw API response |
+
+---
+
+## Image orientation
+
+The API automatically corrects image orientation before analysis. It tests four rotations (0°, 90°, 180°, 270°) using the OpenCV Haar cascade and picks the one where a face is detected. Upside-down or sideways photos are handled transparently — if no valid face can be found in any orientation, the request is rejected with `404`.
 
 ---
 
@@ -162,9 +192,9 @@ The landing page at `/` includes an interactive **Playground** — a four-step w
 | Layer | Technology |
 |-------|-----------|
 | API | [FastAPI](https://fastapi.tiangolo.com) |
-| Face analysis | [DeepFace](https://github.com/serengil/deepface) |
-| Neural network backend | TensorFlow / Keras |
-| Image processing | OpenCV |
+| Age estimation | [ViT](https://huggingface.co/nateraw/vit-age-classifier) via HuggingFace Transformers |
+| Inference backend | PyTorch (CPU) |
+| Face detection | OpenCV Haar cascade |
 | Frontend | React 18 (CDN) + Tailwind CSS (Play CDN) |
 | Icons | Lucide-style inline SVG |
 | Package / runtime | [uv](https://github.com/astral-sh/uv) |
