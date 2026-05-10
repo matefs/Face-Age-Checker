@@ -2,7 +2,14 @@
 
 <img width="1915" height="1026" alt="Face Age Checker landing page" src="https://github.com/user-attachments/assets/3055ad08-dbd6-4473-aab0-db4002c1c1ef" />
 
+### Identifying minors: 
+
+<img width="709" height="576" alt="image" src="https://github.com/user-attachments/assets/74dad4f2-7840-48bc-b97c-3da209099e64" />
+
+
 An open-source facial age verification API built with FastAPI — designed to help digital platforms comply with Brazil's **Estatuto da Criança e do Adolescente (ECA, Law nº 8.069/90)**, which restricts minors from accessing certain content and services.
+
+
 
 ---
 
