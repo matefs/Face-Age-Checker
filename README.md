@@ -181,4 +181,4 @@ face-age-checker/
 
 ---
 
-Made by [Mateus Schverz](https://github.com/matefs)
+Made by [Mateus Schverz (linkedin)](https://www.linkedin.com/in/mateus-schverz/)
